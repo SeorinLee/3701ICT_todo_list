@@ -1,15 +1,44 @@
+//AddTodoScreen.js
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AddTodoScreen() {
   const navigation = useNavigation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!title || !description) {
+      Alert.alert('Validation Error', 'Please enter both title and description.');
+      return;
+    }
 
+    const newTodo = {
+      id: Math.random().toString(),
+      title,
+      description,
+      expanded: false,
+      finished: false,
+    };
+
+    try {
+      const existingTodos = await AsyncStorage.getItem('@todos');
+      let todos = [];
+      if (existingTodos !== null) {
+        todos = JSON.parse(existingTodos);
+      }
+      todos.push(newTodo);
+      await AsyncStorage.setItem('@todos', JSON.stringify(todos));
+      setTitle('');
+      setDescription('');
+      Alert.alert('Success', 'Todo added successfully.');
+    } catch (error) {
+      console.error('Error saving todo to AsyncStorage:', error);
+      Alert.alert('Error', 'Failed to save todo. Please try again later.');
+    }
   };
 
   return (
@@ -36,7 +65,7 @@ export default function AddTodoScreen() {
           <Ionicons name="close" size={24} color="black" />
           <Text style={styles.buttonText}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleSave}>
+        <TouchableOpacity style={[styles.button, { opacity: title && description ? 1 : 0.5 }]} onPress={handleSave} disabled={!title || !description}>
           <Ionicons name="save" size={24} color="black" />
           <Text style={styles.buttonText}>Save</Text>
         </TouchableOpacity>
@@ -67,7 +96,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   descriptionInput: {
-    height: 100, // Adjust the height as needed
+    height: 100,
   },
   buttonContainer: {
     flexDirection: 'row',

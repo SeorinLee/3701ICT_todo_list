@@ -1,25 +1,106 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+// HomeScreen.js
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsFocused } from '@react-navigation/native';
+import TodoList from '../components/TodoList';
+import { Ionicons } from '@expo/vector-icons';
 
-export default function App() {
+export default function HomeScreen({ route }) {
   const navigation = useNavigation();
+  const [todos, setTodos] = useState([]);
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    const loadTodos = async () => {
+      try {
+        const storedTodos = await AsyncStorage.getItem('@todos');
+        if (storedTodos !== null) {
+          const parsedTodos = JSON.parse(storedTodos);
+          const todosWithExpandedState = parsedTodos.map(todo => ({
+            ...todo,
+            expanded: false 
+          }));
+          setTodos(todosWithExpandedState);
+        }
+      } catch (error) {
+        console.error('Error loading todos from AsyncStorage:', error);
+      }
+    };
+
+    loadTodos();
+  }, [isFocused]);
+
+  const saveTodos = async (updatedTodos) => {
+    try {
+      await AsyncStorage.setItem('@todos', JSON.stringify(updatedTodos));
+    } catch (error) {
+      console.error('Error saving todos to AsyncStorage:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (route.params?.newTodo) {
+      const updatedTodos = [...todos, { ...route.params.newTodo }]; 
+      setTodos(updatedTodos);
+      saveTodos(updatedTodos);
+    }
+  }, [route.params?.newTodo]);
+
+  const toggleTodoExpand = (id) => {
+    setTodos(todos.map(todo => {
+      if (todo.id === id) {
+        return { ...todo, expanded: !todo.expanded };
+      }
+      return todo;
+    }));
+  };
+
+  const markTodoAsFinished = async (id) => {
+    const updatedTodos = todos.map(todo => {
+      if (todo.id === id) {
+        return { ...todo, finished: true, expanded: true}; 
+      }
+      return todo;
+    });
+    setTodos(updatedTodos);
+    await saveTodos(updatedTodos);
+  };
+
+  const removeTodo = (id) => {
+    Alert.alert(
+      'Confirmation',
+      'Are you sure you want to delete this todo?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          onPress: () => {
+            const updatedTodos = todos.filter(todo => todo.id !== id);
+            setTodos(updatedTodos);
+            saveTodos(updatedTodos);
+          },
+          style: 'destructive',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.innercontainer}>
-        <Text style={styles.title}>My Todo List</Text>
-      </View>
-      <View style={styles.titleseparator}></View>
-      <View style={styles.todoList}>
-        <Text style={styles.todoItem}>Buy milk</Text>
-        <Text style={styles.todoItem}>Buy bread</Text>
-        <Text style={styles.todoItem}>Buy eggs</Text>
-        <View style={styles.listseparator}></View>
-      </View>
-      <View style={styles.buttonSeparator}></View>
+      <Text style={styles.title}>My Todo List</Text>
+      <TodoList
+        todos={todos}
+        toggleTodoExpand={toggleTodoExpand}
+        markTodoAsFinished={markTodoAsFinished}
+        removeTodo={removeTodo}
+      />
       <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('AddTodo')}>
         <View style={styles.buttonContent}>
           <Ionicons name="add-circle-outline" size={24} color="white" />
@@ -36,44 +117,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  innercontainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingTop: 50,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 50, 
-  },
-  titleseparator: {
-    width: '88%',
-    height: 2, 
-    backgroundColor: 'black', 
-    marginTop: 10,
-  },
-  todoList: {
-    alignItems: 'flex-start',
-    marginTop: 10,
-    marginLeft: 5,
-  },
-  todoItem: {
-    fontSize: 18,
-    marginBottom: 10,
-    backgroundColor: 'rgb(176, 227, 255)',
-    fontSize: 15,
-    width: 350,
-    height: 35,
-    lineHeight: 35,
-    paddingLeft: 10,
-    borderRadius: 10,
-  },
-  listseparator:{
-    width: '94%',
-    height: 1, 
-    backgroundColor: 'black', 
-    marginTop: 450,
+    marginBottom: 20,
   },
   addButton: {
     backgroundColor: 'rgb(2, 151, 250)',
@@ -81,26 +130,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 60,
     borderRadius: 2,
     marginTop: 10,
-    marginBottom: 60,
-    marginLeft: 20,
-    marginRight: 20,
     alignItems: 'center',
-    elevation: 3, 
+    elevation: 3,
   },
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  addButtonText:{
+  addButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 5,
-  },
-  buttonSeparator: {
-    width: '90%',
-    height: 2,
-    backgroundColor: 'black',
-    marginTop: 10,
   },
 });
